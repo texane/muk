@@ -1,0 +1,173 @@
+overview of the virtual memory subsytem
+---------------------------------------
+
+The virtual memory is a set describing how a virtual address
+is mapped to a physical resource. The physical resource can
+be a page frame of physical memory, a block on the disk, a
+page frame on a remote cache...
+
+Virtual memory is impelmented with a cache that contain an
+entry for every possible mapping. If there is no entry for
+the virtual address in the cache, a cache fault is raised;
+If the kernel is not able to handle this cache fault, then
+the translation cannot occur.
+
+Address spaces are sets containing virtual mappings. Associated
+with a tasks, they are beter known as processes in traditional
+operating systems.
+Address spaces are manipulated through the following api:
+
+
+ia32 memory management unit
+---------------------------
+Ia32 memory management unit (mmu) provides structures for the cpu
+to manage virtual to physical mapping. They are known as pages. A
+page is a range (4k or 4Mo) of contiguous virtual memory. An access
+inside this range raises an exception(page fault) if the underlying
+physical resource(page frame) is not present. The page fault handler
+is invoked to handle the exception.
+
+
+page fault handler
+------------------
+Upon the receiption of a page fault, a vm cache lookup is done on the vm
+cache for the specified mapping. If such a mapping exists, it is added
+to the structure provided by the mmu. If it does not exist, a fault occurs.
+
+
+virtual memory cache api
+------------------------
+error_t vm_cache_initialize(vm_cache_t* cache);
+error_t vm_cache_cleanup(vm_cache_t* cache);
+error_t vm_cache_add(vm_cache_t*, id_t i_map);
+error_t vm_cache_del(vm_cache_t, id_t);
+error_t vm_cache_lookup_virt(vm_cache_t*, vaddr_t, id_t* i_map);
+
+
+virtual memory objects
+----------------------
+A virtual memory object is any entity whose content
+can be virtually addressable. This is made possible
+by the use of a pager that contains operations to fetch
+the object backing store into the physical memory upon
+the receiption of a page fault, or to synchronise the
+backing store with the content of the physical memory
+when asked(for instance, memory flush, swap out cycle...).
+
+[*] identity pager
+The most simple pager is the identity pager. An object
+containing the identity pager as its pager has its own 
+physical memory as backing store. Thus, this object cannot
+be swapped out of memory (ie. it is resident). This is
+how the resident / non swappable memory is implemented.
+
+[*] swap file pager
+By definition, anonymous virtual memory is not associated
+with any file. The swap file is then used.
+
+[*] network pager
+
+-> all that is made useseless since the virtual file
+system api has a vnode: if the pager is associated with
+a vnode describing swap file, memory or socket, all
+the above pager are made useless.
+
+
+virtual mapping api
+-------------------
+error_t vm_mapping_create(id_t* i_map, id_t i_res);
+error_t vm_mapping_set_attr(id_t* i_map, vm_attr_t);
+error_t vm_mapping_is_attr(id_t i_map, vm_attr_t);
+error_t vm_mapping_delete(vm_cache_t*, id_t i_map);
+
+
+address space api
+-----------------
+error_t vm_as_create_identity(id_t*);
+error_t vm_as_switch_to(id_t);
+error_t vm_as_create(id_t*);
+error_t vm_as_delete(id_t);
+error_t vm_as_map(id_t i_as, id_t i_map);
+error_t vm_as_umap(id_t i_as, id_t i_map);
+
+
+-- new start here
+
+
+-> design of the muk virtual memory
+
+	-> physical memory model
+		-> physical memory seen as set of
+		 contiguous range of page frames
+		-> constraint on memory range is
+		only dictated by the dma engine
+
+	-> page table update
+		-> 
+
+
+-> when page fault occurs
+	-> v = cr2
+	-> is_vaddr_valid(v) // look into vm_map_t list
+	-> p = allocate_one_page()
+	-> vm_create_mapping(v, p) // add perms
+
+
+-> page_dir is always present in memory
+	-> when allocating an adress space, allocate the page
+	directory entry
+-> 
+
+-> vm_create_mapping(v)
+	// notes: pde, pte... are virtual addresses.
+	// as such, they must have a valid mapping
+	// during our mapping update (otherwise a page
+	// fault would occur inside the page fault).
+ 	// Solution:
+	// We know that one entry points to a 4k structure.
+	// We want every entry in this structure to have
+	// a valid address.
+	//
+
+	pde = cr3 + doff;
+	
+	// setup the pde
+	if (pde.present == 0)
+	{
+		pt = allocate_page();
+		// we have a page. this is a paddr. we
+		// want to access its contents, thus
+		// it has to have a valid translation.
+		pt_reset(pt);
+		pde.present = 1;
+		pde.address = pt;
+	}
+	pt = pde_get_pt(pde);
+	pte = pt + off;
+
+	// setup the pte
+	if (pte.present == false)
+	{
+		pf = allocate_page();
+		pf_reset(pf);
+		pte.present = 1;
+		pte.address = pf;
+	}
+
+	// done
+
+
+-> vm_delete_mapping(v)
+	// take care of enrtries to be present
+	-> pde = cr3 + doff;
+	-> pt = pde.pt;
+	-> pte = pt + toff;
+	-> walk pt, if no mapping present
+
+
+
+-> we allocate a page frame @ paddr
+-> we want to modify the content of paddr
+	-> has to turn paddr into a valid vaddr
+	-> cannot be done by the pagefaulter since
+	we are already handling a page fault

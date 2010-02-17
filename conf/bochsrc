@@ -1,0 +1,5 @@
+boot:floppy
+floppya: 1_44=build/install/disk.img, status=inserted
+megs: 32
+romimage: file=/etc/bochs/bios/BIOS-bochs-latest, address=0xe0000
+vgaromimage: /etc/bochs/bios/VGABIOS-lgpl-latest

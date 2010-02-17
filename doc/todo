@@ -1,0 +1,26 @@
+-> misc
+	-> cleanup kernel.c
+	-> cleanup build environment
+	-> way to choose which files are
+	compiled, one makefile per subsystem
+
+-> kernel
+	-> kernel_init
+		-> initialize kernel_t with base + size
+		-> initialize a stack for the kernel
+		-> used for identity mapping
+		-> relocate the kernel
+
+-> mm
+	-> implement segments
+		-> initiale segments are statically allocated
+		-> get initial segments from the
+	-> implement regions
+	-> vm_alloc, vm_free
+
+-> libc
+	-> implement malloc, free on top of vm_alloc, vm_free
+
+-> unit
+	-> mm/
+		-> move tests from mm/mm.c, mm/vm.c in unit/mm
